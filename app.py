@@ -14,7 +14,7 @@ app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
 app.config['UPLOAD_EXTENSIONS'] = ['.jpg', '.png', '.gif']
 app.config['UPLOAD_PATH'] = 'uploads'
 
-# Set True when using Cloud Storage
+# Set False when using Cloud Storage
 app.config['LOCAL_STORAGE'] = True
 
 # Provide Bucket Name when using Cloud Storage
