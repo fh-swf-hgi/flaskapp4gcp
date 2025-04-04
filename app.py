@@ -1,7 +1,6 @@
 ### Code taken from: Miguel Grinberg - "Handling File Uploads With Flask"
 ### https://blog.miguelgrinberg.com/post/handling-file-uploads-with-flask
 
-import imghdr
 import os
 from flask import Flask, render_template, request, redirect, url_for, abort, send_from_directory
 from werkzeug.utils import secure_filename
