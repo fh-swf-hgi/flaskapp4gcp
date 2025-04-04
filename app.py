@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 #from google.cloud import storage
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 app.config['UPLOAD_EXTENSIONS'] = ['.jpg', '.png', '.gif']
 app.config['UPLOAD_PATH'] = 'uploads'
 
@@ -36,14 +36,18 @@ def upload_obj(bucketname, dateiname, zielname=None):
     """
     pass
 
-
 def validate_image(stream):
-    header = stream.read(512)
-    stream.seek(0) 
-    format = imghdr.what(None, header)
-    if not format:
+    header = stream.read(10)
+    stream.seek(0)
+
+    if header.startswith(b'\xff\xd8'):  # JPEG
+        return '.jpg'
+    elif header.startswith(b'\x89PNG\r\n\x1a\n'):  # PNG
+        return '.png'
+    elif header[:6] in (b'GIF87a', b'GIF89a'):  # GIF
+        return '.gif'
+    else:
         return None
-    return '.' + (format if format != 'jpeg' else 'jpg')
 
 @app.route('/')
 def index():
