@@ -56,7 +56,10 @@ def validate_image(stream):
 @app.route('/')
 def index():
     if app.config['LOCAL_STORAGE']:
-        files = os.listdir(app.config['UPLOAD_PATH'])
+        files = [
+                f for f in os.listdir(app.config['UPLOAD_PATH'])
+                if os.path.splitext(f)[1].lower() in app.config['UPLOAD_EXTENSIONS']
+        ]
     else:
         files = [f.name for f  in list_blobs(app.config['BUCKET_NAME'])]
     return render_template('index.html', files=files)
