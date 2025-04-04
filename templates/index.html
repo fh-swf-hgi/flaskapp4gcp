@@ -1,17 +1,69 @@
 <!doctype html>
-<html>
+<html lang="de">
   <head>
-    <title>File Upload</title>
+    <meta charset="UTF-8">
+    <title>Image Upload Service</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 2em auto;
+        max-width: 700px;
+        padding: 1em;
+        background-color: #f9f9f9;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+      }
+      h1 {
+        text-align: center;
+        color: #222;
+      }
+      form {
+        text-align: center;
+        margin-bottom: 2em;
+      }
+      input[type="file"] {
+        margin-bottom: 1em;
+      }
+      .gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+      }
+      .gallery img {
+        width: 120px;
+        height: auto;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        object-fit: cover;
+        background: #fff;
+        padding: 4px;
+      }
+      .no-files {
+        text-align: center;
+        color: #777;
+        font-style: italic;
+      }
+    </style>
   </head>
   <body>
-    <h1>File Upload</h1>
+    <h1>Image Upload Service</h1>
     <form method="POST" action="" enctype="multipart/form-data">
-      <p><input type="file" name="file"></p>
-      <p><input type="submit" value="Submit"></p>
+      <input type="file" name="file" accept=".jpg,.jpeg,.png,.gif" required><br>
+      <input type="submit" value="Hochladen">
     </form>
+
     <hr>
-    {% for file in files %}
-    <img src="{{ url_for('upload', filename=file) }}" style="width: 64px">
-    {% endfor %}
+
+    {% if files %}
+      <div class="gallery">
+        {% for file in files if file and file|length > 0 %}
+          <img src="{{ url_for('upload', filename=file) }}" alt="{{ file }}">
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="no-files">Noch keine Bilder hochgeladen.</p>
+    {% endif %}
   </body>
 </html>
