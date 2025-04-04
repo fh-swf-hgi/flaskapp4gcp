@@ -20,6 +20,10 @@ app.config['LOCAL_STORAGE'] = True
 # Provide Bucket Name when using Cloud Storage
 app.config['BUCKET_NAME'] = 'Your bucket name here'
 
+
+if app.config['LOCAL_STORAGE']:
+    os.makedirs(app.config['UPLOAD_PATH'], exist_ok=True)
+
 def list_blobs(bucket_name):
     """
     Objekte in einem Bucket auflisten:
