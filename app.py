@@ -39,6 +39,15 @@ def upload_obj(bucketname, dateiname, zielname=None):
     """
     pass
 
+def download_obj(bucketname, objname, zielname=None):
+    """Objekt aus Bucket herunterladen"""
+    if zielname is None:
+        zielname = objname
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucketname)
+    obj = bucket.blob(objname)
+    obj.download_to_filename(zielname)
+
 def validate_image(stream):
     header = stream.read(10)
     stream.seek(0)
@@ -80,7 +89,15 @@ def upload_files():
 
 @app.route('/uploads/<filename>')
 def upload(filename):
-    return send_from_directory(app.config['UPLOAD_PATH'], filename)
+    if app.config.get('LOCAL_STORAGE', True):
+        return send_from_directory(app.config['UPLOAD_PATH'], filename)
+    else:
+        tmp_path = f"/tmp/{filename}"
+        try:
+            download_obj(app.config['BUCKET_NAME'], filename, tmp_path)
+        except Exception:
+            abort(404)
+        return send_from_directory('/tmp', filename)
   
 
 if __name__ == "__main__":
