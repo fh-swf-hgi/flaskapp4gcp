@@ -2,6 +2,12 @@
 ### https://blog.miguelgrinberg.com/post/handling-file-uploads-with-flask
 
 import os
+
+os.environ["GCE_METADATA_HOST"] = "metadata.google.internal"
+os.environ["GCE_METADATA_MTLS_MODE"] = "none"
+os.environ["NO_PROXY"] = "metadata.google.internal,169.254.169.254"
+os.environ["no_proxy"] = "metadata.google.internal,169.254.169.254"
+
 from flask import Flask, render_template, request, redirect, url_for, abort, send_from_directory
 from werkzeug.utils import secure_filename
 
