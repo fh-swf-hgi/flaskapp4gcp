@@ -1,110 +1,138 @@
-### Code taken from: Miguel Grinberg - "Handling File Uploads With Flask"
-### https://blog.miguelgrinberg.com/post/handling-file-uploads-with-flask
+import argparse
+from pathlib import Path
 
-import os
-
-os.environ["GCE_METADATA_HOST"] = "metadata.google.internal"
-os.environ["GCE_METADATA_MTLS_MODE"] = "none"
-os.environ["NO_PROXY"] = "metadata.google.internal,169.254.169.254"
-os.environ["no_proxy"] = "metadata.google.internal,169.254.169.254"
-
-from flask import Flask, render_template, request, redirect, url_for, abort, send_from_directory
+from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
-# Uncomment when using Cloud Storage
-#from google.cloud import storage
+# Default-Konfiguration
+DEFAULT_USE_CLOUD_STORAGE = False
+DEFAULT_BUCKET_NAME = "fhkuerzel-imagebucket"
+DEFAULT_UPLOAD_DIR = "uploads"
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+
+
+# Kommandozeilenparameter
+parser = argparse.ArgumentParser()
+parser.add_argument("--cloud-storage", action="store_true")
+parser.add_argument("--bucket", default=DEFAULT_BUCKET_NAME)
+parser.add_argument("--upload-dir", default=DEFAULT_UPLOAD_DIR)
+
+args = parser.parse_args()
+
+USE_CLOUD_STORAGE = args.cloud_storage
+BUCKET_NAME = args.bucket
+UPLOAD_DIR = Path(args.upload_dir)
+
+
+if USE_CLOUD_STORAGE:
+    from google.cloud import storage
+    storage_client = storage.Client()
+else:
+    UPLOAD_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
-app.config['UPLOAD_EXTENSIONS'] = ['.jpg', '.png', '.gif']
-app.config['UPLOAD_PATH'] = 'uploads'
-
-# Set False when using Cloud Storage
-app.config['LOCAL_STORAGE'] = True
-
-# Provide Bucket Name when using Cloud Storage
-app.config['BUCKET_NAME'] = 'Your bucket name here'
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_SIZE
 
 
-if app.config['LOCAL_STORAGE']:
-    os.makedirs(app.config['UPLOAD_PATH'], exist_ok=True)
+def validate_image(file):
+    header = file.read(10)
+    file.seek(0)
 
-def list_blobs(bucket_name):
-    """
-    Objekte in einem Bucket auflisten:
-    https://cloud.google.com/storage/docs/listing-objects?hl=de#storage-list-objects-python
-    """
-    pass
+    if header.startswith(b"\xff\xd8"):
+        return ".jpg"
 
-def upload_obj(bucketname, dateiname, zielname=None):
-    """
-    Datei in einen Bucket hochladen
-    https://cloud.google.com/storage/docs/uploading-objects?hl=de#storage-upload-object-python
-    Hint: Use 'upload_from_string' as the file content is sent via a POST request:
-    https://stackoverflow.com/questions/70116860/upload-file-to-cloud-storage-from-request-without-saving-it-locally
-    """
-    pass
+    if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
 
-def download_obj(bucketname, objname, zielname=None):
-    """Objekt aus Bucket herunterladen"""
-    if zielname is None:
-        zielname = objname
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucketname)
-    obj = bucket.blob(objname)
-    obj.download_to_filename(zielname)
+    if header[:6] in (b"GIF87a", b"GIF89a"):
+        return ".gif"
 
-def validate_image(stream):
-    header = stream.read(10)
-    stream.seek(0)
+    return None
 
-    if header.startswith(b'\xff\xd8'):  # JPEG
-        return '.jpg'
-    elif header.startswith(b'\x89PNG\r\n\x1a\n'):  # PNG
-        return '.png'
-    elif header[:6] in (b'GIF87a', b'GIF89a'):  # GIF
-        return '.gif'
+
+def list_files():
+    if USE_CLOUD_STORAGE:
+        bucket = storage_client.bucket(BUCKET_NAME)
+        return [blob.name for blob in storage_client.list_blobs(bucket)]
+
+    return [
+        p.name for p in UPLOAD_DIR.iterdir()
+        if p.suffix.lower() in ALLOWED_EXTENSIONS
+    ]
+
+
+def save_file(file, filename):
+    if USE_CLOUD_STORAGE:
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(filename)
+
+        blob.upload_from_file(
+            file,
+            content_type=file.content_type,
+            rewind=True
+        )
     else:
-        return None
+        file.save(UPLOAD_DIR / filename)
 
-@app.route('/')
-def index():
-    if app.config['LOCAL_STORAGE']:
-        files = [
-                f for f in os.listdir(app.config['UPLOAD_PATH'])
-                if os.path.splitext(f)[1].lower() in app.config['UPLOAD_EXTENSIONS']
-        ]
-    else:
-        files = [f.name for f  in list_blobs(app.config['BUCKET_NAME'])]
-    return render_template('index.html', files=files)
- 
-@app.route('/', methods=['POST'])
-def upload_files():
-    uploaded_file = request.files['file']
-    filename = secure_filename(uploaded_file.filename)
-    if filename != '':
-        file_ext = os.path.splitext(filename)[1]
-        if file_ext not in app.config['UPLOAD_EXTENSIONS'] or \
-                file_ext != validate_image(uploaded_file.stream):
-            abort(400)
-        if app.config['LOCAL_STORAGE']:
-            uploaded_file.save(os.path.join(app.config['UPLOAD_PATH'], filename))
-        else:
-            upload_obj(app.config['BUCKET_NAME'], uploaded_file,  filename)
-    return redirect(url_for('index'))
 
-@app.route('/uploads/<filename>')
-def upload(filename):
-    if app.config.get('LOCAL_STORAGE', True):
-        return send_from_directory(app.config['UPLOAD_PATH'], filename)
-    else:
-        tmp_path = f"/tmp/{filename}"
-        try:
-            download_obj(app.config['BUCKET_NAME'], filename, tmp_path)
-        except Exception:
+def get_file(filename):
+    if USE_CLOUD_STORAGE:
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(filename)
+
+        if not blob.exists():
             abort(404)
-        return send_from_directory('/tmp', filename)
-  
+
+        return send_file(
+            blob.open("rb"),
+            mimetype=blob.content_type or "application/octet-stream",
+            download_name=filename
+        )
+
+    path = UPLOAD_DIR / filename
+
+    if not path.exists():
+        abort(404)
+
+    return send_file(path)
+
+
+@app.route("/")
+def index():
+    return render_template("index.html", files=list_files())
+
+
+@app.route("/", methods=["POST"])
+def upload():
+    file = request.files.get("file")
+
+    if file is None or file.filename == "":
+        return redirect(url_for("index"))
+
+    filename = secure_filename(file.filename)
+    suffix = Path(filename).suffix.lower()
+
+    if suffix not in ALLOWED_EXTENSIONS:
+        abort(400)
+
+    if validate_image(file.stream) is None:
+        abort(400)
+
+    save_file(file, filename)
+
+    return redirect(url_for("index"))
+
+
+@app.route("/uploads/<path:filename>")
+def uploaded_file(filename):
+    return get_file(filename)
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0")
+    print(f"Cloud Storage: {USE_CLOUD_STORAGE}")
+    print(f"Bucket: {BUCKET_NAME}")
+    print(f"Upload Directory: {UPLOAD_DIR}")
+
+    app.run(host="0.0.0.0", port=5000)
