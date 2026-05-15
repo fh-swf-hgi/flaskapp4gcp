@@ -17,4 +17,10 @@ APP_DIR=/opt/flaskapp4gcp
 APP_USER=$(getent passwd 1000 | cut -d: -f1)
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+cat >> /home/$APP_USER/.bashrc <<EOF
+
+cd /opt/flaskapp4gcp
+source /opt/flaskapp4gcp/venv/bin/activate
+EOF
+
 echo "Bootstrap abgeschlossen"
