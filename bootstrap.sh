@@ -13,6 +13,8 @@ python3 -m venv venv
 ./venv/bin/pip install --upgrade pip
 ./venv/bin/pip install Flask google-cloud-storage pyopenssl
 
-mkdir -p uploads
+APP_DIR=/opt/flaskapp4gcp
+APP_USER=$(getent passwd 1000 | cut -d: -f1)
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
 echo "Bootstrap abgeschlossen"
