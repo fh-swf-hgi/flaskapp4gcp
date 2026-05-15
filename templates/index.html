@@ -59,7 +59,7 @@
     {% if files %}
       <div class="gallery">
         {% for file in files if file and file|length > 0 %}
-          <img src="{{ url_for('upload', filename=file) }}" alt="{{ file }}">
+          <img src="{{ url_for('uploaded_file', filename=file) }}" alt="{{ file }}">
         {% endfor %}
       </div>
     {% else %}
